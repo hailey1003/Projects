@@ -1,6 +1,6 @@
 """
 CSE 331 Project 1
-Author: *your name here*
+Author: Hailey Reese
 """
 import math
 class DLLNode:
