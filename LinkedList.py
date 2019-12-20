@@ -199,12 +199,3 @@ def remove_fake_requests(head):
         else:
             head.next = remove_fake_requests(head.next)
             return head
-        
-
-def main():
-    requests = insert(123456)
-    insert(123456, requests)
-    insert(123456, requests)
-    requests = remove_fake_requests(requests)
-    print(to_string(requests))
-main()
