@@ -1,0 +1,331 @@
+---
+title: "STT 465 Project"
+author: "Hailey Reese"
+date: "12/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("PerformanceAnalytics")
+library(ggplot2)
+```
+
+
+```{r}
+urine <- boot::urine
+urine <- na.omit(urine)
+urine
+```
+
+```{r}
+fit <- lm(r~gravity+ph+osmo+cond+urea+calc, data=urine)
+summary(fit)
+```
+```{r}
+fit2 <- lm(r~gravity+ph+cond+urea+calc, data=urine)
+summary(fit2)
+```
+
+```{r}
+final_fit <- lm(r~gravity+cond+urea+calc, data=urine)
+summary(final_fit)
+```
+
+```{r}
+car::vif(final_fit)
+```
+
+
+```{r}
+logP=function(y,X,b,b0,varB){
+  Xb=X%*%b
+  theta=exp(Xb)/(1+exp(Xb))
+  logLik=sum( dbinom(x=y,p=theta,size=1,log=T)  )
+  logPrior=sum(  dnorm(x=b,sd=sqrt(varB),mean=b0,log=T))
+  return(logLik+logPrior)
+}
+
+
+logisticRegressionBayes=function(y,X,nIter=100000,V=.02,varB=rep(10000,ncol(X)),b0=rep(0,ncol(X))){
+  
+  ####### Arguments #######################
+  # y  a vector with 0/1 values
+  # X  incidence matrix of effects
+  # b0,varB, the prior mean and prior variance bj~N(b0[j],varB[j])
+  # V the variance of the normal distribution used to generate candidates~N(b[i-1],V)
+  # nIter: number of iterations of the sampler
+  # Details: generates samples from the posterior distribution of a logistic regression using a Metropolis algorithm
+  #########################################
+  
+  # A matrix to store samples
+  p=ncol(X)
+  B=matrix(nrow=nIter,ncol=p)
+  colnames(B)=colnames(X)
+  
+  # A vector to trace acceptance
+  accept=matrix(nrow=nIter,ncol=p,NA)
+  accept[1,]=TRUE 
+  
+  # Initialize
+  B[1,]=0
+  B[1,1]=log(mean(y)/(1-mean(y)))
+  b=B[1,]
+  for(i in 2:nIter){
+    
+    for(j in 1:p){
+      candidate=b
+      candidate[j]=rnorm(mean=b[j],sd=sqrt(V),n=1)
+      
+      logP_current=logP(y,X,b0=b0,varB=varB,b=b)
+      logP_candidate=logP(y,X,b0=b0,varB=varB,b=candidate)
+      r=min(1,exp(logP_candidate-logP_current))
+      delta=rbinom(n=1,size=1,p=r)
+      
+      accept[i,j]=delta
+      
+      if(delta==1){ b[j]=candidate[j] }
+    }
+    B[i,]=b
+    if(i%%1000==0){
+      message(" Iteration ",i)
+    }
+    
+  }
+  
+  return(list(B=B,accept=accept))
+}
+
+```
+
+```{r}
+bayes_fit = glm(formula = r ~ gravity + cond + urea + calc, family = binomial,data = urine)
+summary(bayes_fit)
+```
+
+```{r}
+Z=as.matrix(model.matrix(~gravity+cond+urea+calc,data=urine)) #[,-1]
+samples=logisticRegressionBayes(y=urine$r,X=cbind(Z),nIter=50000)
+print(samples$accept)
+cbind(fm1$coef,colMeans(samples$accept[-(1:10000),]))
+```
+
+
+
+```{r}
+qqnorm(urine$gravity, pch = 1, frame = FALSE)
+qqline(urine$gravity, col = "steelblue", lwd = 2)
+```
+
+```{r}
+qqnorm(urine$ph, pch = 1, frame = FALSE)
+qqline(urine$ph, col = "steelblue", lwd = 2)
+```
+
+```{r}
+qqnorm(urine$osmo, pch = 1, frame = FALSE)
+qqline(urine$osmo, col = "steelblue", lwd = 2)
+```
+
+
+```{r}
+qqnorm(urine$cond, pch = 1, frame = FALSE)
+qqline(urine$cond, col = "steelblue", lwd = 2)
+```
+
+```{r}
+qqnorm(urine$urea, pch = 1, frame = FALSE)
+qqline(urine$urea, col = "steelblue", lwd = 2)
+```
+
+```{r}
+qqnorm(urine$calc, pch = 1, frame = FALSE)
+qqline(urine$calc, col = "steelblue", lwd = 2)
+```
+
+
+```{r}
+gravity.lm = lm(r ~ gravity, data=urine) 
+gravity.res = resid(gravity.lm)
+plot(gravity.res,urine$r, xlab="Residuals") 
+```
+
+```{r}
+chart.Correlation(urine)
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = gravity)) + geom_point() + geom_jitter()
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = ph)) + geom_point() + geom_jitter()
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = osmo)) + geom_point() + geom_jitter()
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = cond)) + geom_point() + geom_jitter()
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = urea)) + geom_point() + geom_jitter()
+```
+
+```{r}
+ggplot(data = urine, aes(x = r, y = calc)) + geom_point() + geom_jitter()
+```
+
+
+```{r}
+plot(fit, which=1, col=c("blue"))
+```
+
+
+```{r}
+plot(fit2, which=1, col=c("blue"))
+```
+
+```{r}
+plot(final_fit, which=1, col=c("blue"))
+```
+
+```{r}
+plot(fit, which=2, col=c("blue"))
+```
+
+```{r}
+plot(fit2, which=2, col=c("blue"))
+```
+
+```{r}
+plot(final_fit, which=2, col=c("blue"))
+```
+
+```{r}
+quantile1 <- list(p=0.5, x=0.50)    
+quantile2 <- list(p=0.99999,x=0.75)
+quantile3 <- list(p=0.00001,x=0.25)
+```
+
+```{r}
+findBeta <- function(quantile1,quantile2,quantile3)
+  {
+     # find the quantiles specified by quantile1 and quantile2 and quantile3
+     quantile1_p <- quantile1[[1]]; quantile1_q <- quantile1[[2]]
+     quantile2_p <- quantile2[[1]]; quantile2_q <- quantile2[[2]]
+     quantile3_p <- quantile3[[1]]; quantile3_q <- quantile3[[2]]
+
+     # find the beta prior using quantile1 and quantile2
+     priorA <- beta.select(quantile1,quantile2)
+     priorA_a <- priorA[1]; priorA_b <- priorA[2]
+
+     # find the beta prior using quantile1 and quantile3
+     priorB <- beta.select(quantile1,quantile3)
+     priorB_a <- priorB[1]; priorB_b <- priorB[2]
+
+     # find the best possible beta prior
+     diff_a <- abs(priorA_a - priorB_a); diff_b <- abs(priorB_b - priorB_b)
+     step_a <- diff_a / 100; step_b <- diff_b / 100
+     if (priorA_a < priorB_a) { start_a <- priorA_a; end_a <- priorB_a }
+     else                     { start_a <- priorB_a; end_a <- priorA_a }
+     if (priorA_b < priorB_b) { start_b <- priorA_b; end_b <- priorB_b }
+     else                     { start_b <- priorB_b; end_b <- priorA_b }
+     steps_a <- seq(from=start_a, to=end_a, length.out=1000)
+     steps_b <- seq(from=start_b, to=end_b, length.out=1000)
+     max_error <- 10000000000000000000
+     best_a <- 0; best_b <- 0
+     for (a in steps_a)
+     {
+        for (b in steps_b)
+        {
+           # priorC is beta(a,b)
+           # find the quantile1_q, quantile2_q, quantile3_q quantiles of priorC:
+           priorC_q1 <- qbeta(c(quantile1_p), a, b)
+           priorC_q2 <- qbeta(c(quantile2_p), a, b)
+           priorC_q3 <- qbeta(c(quantile3_p), a, b)
+           priorC_error <- abs(priorC_q1-quantile1_q) +
+                           abs(priorC_q2-quantile2_q) +
+                           abs(priorC_q3-quantile3_q)
+           if (priorC_error < max_error)
+           {
+             max_error <- priorC_error; best_a <- a; best_b <- b
+           }
+       }
+    }
+    print(paste("The best beta prior has a=",best_a,"b=",best_b))
+  }
+```
+
+```{r}
+library("LearnBayes")
+findBeta(quantile1,quantile2,quantile3)
+```
+
+
+```{r}
+curve(dbeta(x,32.27,32.27))
+```
+
+
+```{r}
+calcLikelihoodForProportion <- function(successes, total)
+  {
+     curve(dbinom(successes,total,x)) # plot the likelihood
+  }
+```
+
+```{r}
+count <- table(urine$r)
+coc_count = count[names(count) == 1]
+calcLikelihoodForProportion(coc_count, 77)
+```
+
+```{r}
+
+calcPosteriorForProportion <- function(successes, total, a, b)
+  {
+     # Adapted from triplot() in the LearnBayes package
+     # Plot the prior, likelihood and posterior:
+     likelihood_a = successes + 1; likelihood_b = total - successes + 1
+     posterior_a = a + successes;  posterior_b = b + total - successes
+     theta = seq(0.005, 0.995, length = 500)
+     prior = dbeta(theta, a, b)
+     likelihood = dbeta(theta, likelihood_a, likelihood_b)
+     posterior  = dbeta(theta, posterior_a, posterior_b)
+     m = max(c(prior, likelihood, posterior))
+     plot(theta, posterior, type = "l", ylab = "Density", lty = 2, lwd = 3,
+          main = paste("beta(", a, ",", b, ") prior, B(", total, ",", successes, ") data,",
+          "beta(", posterior_a, ",", posterior_b, ") posterior"), ylim = c(0, m), col = "red")
+     lines(theta, likelihood, lty = 1, lwd = 3, col = "blue")
+     lines(theta, prior, lty = 3, lwd = 3, col = "green")
+     legend(x=0.8,y=m, c("Prior", "Likelihood", "Posterior"), lty = c(3, 1, 2),
+          lwd = c(3, 3, 3), col = c("green", "blue", "red"))
+     # Print out summary statistics for the prior, likelihood and posterior:
+     calcBetaMode <- function(aa, bb) { BetaMode <- (aa - 1)/(aa + bb - 2); return(BetaMode); }
+     calcBetaMean <- function(aa, bb) { BetaMean <- (aa)/(aa + bb); return(BetaMean); }
+     calcBetaSd   <- function(aa, bb) { BetaSd <- sqrt((aa * bb)/(((aa + bb)^2) * (aa + bb + 1))); return(BetaSd); }
+     prior_mode      <- calcBetaMode(a, b)
+     likelihood_mode <- calcBetaMode(likelihood_a, likelihood_b)
+     posterior_mode  <- calcBetaMode(posterior_a, posterior_b)
+     prior_mean      <- calcBetaMean(a, b)
+     likelihood_mean <- calcBetaMean(likelihood_a, likelihood_b)
+     posterior_mean  <- calcBetaMean(posterior_a, posterior_b)
+     prior_sd        <- calcBetaSd(a, b)
+     likelihood_sd   <- calcBetaSd(likelihood_a, likelihood_b)
+     posterior_sd    <- calcBetaSd(posterior_a, posterior_b)
+     print(paste("mode for prior=",prior_mode,", for likelihood=",likelihood_mode,", for posterior=",posterior_mode))
+     print(paste("mean for prior=",prior_mean,", for likelihood=",likelihood_mean,", for posterior=",posterior_mean))
+     print(paste("sd for prior=",prior_sd,", for likelihood=",likelihood_sd,", for posterior=",posterior_sd))
+  }
+```
+
+```{r}
+calcPosteriorForProportion(coc_count, 77, 32.27, 32.27)
+```
+
